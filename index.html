@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flag Shop — Order Country Flags</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://js.paystack.co/v2/inline.js"></script>
+</head>
+
+<body class="bg-gray-50 font-sans text-gray-800">
+
+  <div class="max-w-xl mx-auto bg-white p-6 mt-10 shadow-lg rounded-lg border border-gray-200">
+    <h1 class="text-2xl font-bold text-center mb-4">Order Country Flags</h1>
+
+    <form id="paymentForm" class="space-y-4">
+
+      <!-- Full Name -->
+      <div>
+        <label class="font-semibold">Full Name</label>
+        <input id="fullName" type="text" class="w-full border rounded p-2" required />
+      </div>
+
+      <!-- Phone Number -->
+      <div>
+        <label class="font-semibold">Phone Number</label>
+        <input id="phoneNumber" type="text" class="w-full border rounded p-2" required />
+      </div>
+
+      <!-- Email -->
+      <div>
+        <label class="font-semibold">Email Address</label>
+        <input id="emailInput" type="email" class="w-full border rounded p-2" required />
+      </div>
+
+      <!-- Flag Types -->
+      <div>
+        <label class="font-semibold">Select Country Flag</label>
+        <select id="flagType" class="w-full border rounded p-2" required>
+          <option value="">-- Select Flag --</option>
+          <option value="Ghana">🇬🇭 Ghana</option>
+          <option value="Nigeria">🇳🇬 Nigeria</option>
+          <option value="Kenya">🇰🇪 Kenya</option>
+          <option value="USA">🇺🇸 USA</option>
+          <option value="UK">🇬🇧 United Kingdom</option>
+          <option value="South Africa">🇿🇦 South Africa</option>
+        </select>
+      </div>
+
+      <!-- Quantity -->
+      <div>
+        <label class="font-semibold">Quantity</label>
+        <input id="quantityInput" type="number" min="1" value="1" class="w-full border rounded p-2" required />
+      </div>
+
+      <!-- Additional Notes -->
+      <div>
+        <label class="font-semibold">Notes (Optional)</label>
+        <textarea id="additionalNotes" class="w-full border rounded p-2"></textarea>
+      </div>
+
+      <!-- Total Display -->
+      <div class="font-bold text-xl text-center">
+        Total: <span id="totalCostDisplay">15.00 GHS</span>
+      </div>
+
+      <!-- Pay Button -->
+      <button 
+        type="button"
+        onclick="payWithPaystack()"
+        class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg">
+        Pay <span id="payButtonAmount">15.00 GHS</span>
+      </button>
+
+    </form>
+  </div>
+
+  <script>
+    // Pricing
+    const singleItemPrice = 1500; // 15.00 GHS in pesewas
+    const currencyCode = 'GHS';
+    const paystackPublicKey = 'pk_test_abd87cfba7130da50ae00f96adb63ccdd6b0bc15';
+
+    const quantityInput = document.getElementById('quantityInput');
+    const totalCostDisplay = document.getElementById('totalCostDisplay');
+    const payButtonAmount = document.getElementById('payButtonAmount');
+
+    // Update total
+    function updateTotalPrice() {
+      const quantity = parseInt(quantityInput.value) || 0;
+      const totalAmountGHS = (quantity * singleItemPrice) / 100;
+      const formattedAmount = totalAmountGHS.toFixed(2) + ' ' + currencyCode;
+      
+      totalCostDisplay.textContent = formattedAmount;
+      payButtonAmount.textContent = formattedAmount;
+    }
+
+    quantityInput.addEventListener('input', updateTotalPrice);
+    updateTotalPrice();
+
+    // Paystack Payment
+    function payWithPaystack() {
+
+      const fullName = document.getElementById('fullName').value;
+      const phone = document.getElementById('phoneNumber').value;
+      const email = document.getElementById('emailInput').value;
+      const flagType = document.getElementById('flagType').value;
+      const quantity = parseInt(quantityInput.value);
+      const notes = document.getElementById('additionalNotes').value;
+
+      // Validation
+      if (!fullName || !phone || !email || !flagType || !quantity) {
+        alert("Please fill in all required fields.");
+        return;
+      }
+
+      const totalAmount = quantity * singleItemPrice;
+
+      let handler = Paystack.inline({
+        key: paystackPublicKey,
+        email: email,
+        amount: totalAmount,
+        currency: currencyCode,
+        ref: "FLAG-" + Math.floor((Math.random() * 1000000000) + 1),
+
+        metadata: {
+          custom_fields: [
+            { display_name: "Customer Name", value: fullName },
+            { display_name: "Flag Type", value: flagType },
+            { display_name: "Phone", value: phone },
+            { display_name: "Quantity", value: quantity },
+            { display_name: "Notes", value: notes }
+          ]
+        },
+
+        // --- FULL COMPLETED CALLBACK ---
+        callback: function(response) {
+          alert("Payment successful! Reference: " + response.reference);
+
+          const orderData = {
+            fullName,
+            phone,
+            email,
+            flagType,
+            quantity,
+            notes,
+            amountPaid: (totalAmount / 100),
+            paymentReference: response.reference
+          };
+
+          // Send order to backend
+          fetch("https://your-backend-url.com/api/save-flag-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(orderData)
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              alert("Order submitted successfully!");
+              document.getElementById("paymentForm").reset();
+              updateTotalPrice();
+            } else {
+              alert("Payment succeeded but order failed to save. Contact support.");
+            }
+          })
+          .catch(err => {
+            alert("Payment succeeded but server error occurred.");
+            console.error(err);
+          });
+        },
+
+        onClose: function() {
+          alert("Payment window closed.");
+        }
+      });
+
+      handler.openIframe();
+    }
+  </script>
+
+</body>
+</html>
